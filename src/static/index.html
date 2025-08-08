@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BullAware Monitor - eToro Trader Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .signal-buy {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .signal-sell {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="trending-up" class="w-8 h-8"></i>
+                    <h1 class="text-2xl font-bold">BullAware Monitor</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        <span>Refresh Data</span>
+                    </button>
+                    <div class="flex items-center space-x-2 text-sm">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span>Live</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Analytics Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Total Traders</p>
+                        <p id="totalTraders" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-lg">
+                        <i data-lucide="users" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Active Signals</p>
+                        <p id="totalSignals" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <i data-lucide="zap" class="w-6 h-6 text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Day Traders</p>
+                        <p id="dayTraders" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-orange-100 p-3 rounded-lg">
+                        <i data-lucide="clock" class="w-6 h-6 text-orange-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Long-term Investors</p>
+                        <p id="longTermTraders" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-purple-100 p-3 rounded-lg">
+                        <i data-lucide="calendar" class="w-6 h-6 text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Tabs -->
+        <div class="bg-white rounded-xl shadow-sm mb-8">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6">
+                    <button class="strategy-tab py-4 px-2 border-b-2 border-blue-500 text-blue-600 font-medium" data-strategy="all">
+                        All Strategies
+                    </button>
+                    <button class="strategy-tab py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-strategy="day_trading">
+                        Day Trading
+                    </button>
+                    <button class="strategy-tab py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-strategy="long_term">
+                        Long-term Investing
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Trading Signals -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-semibold text-gray-900">Trading Signals</h2>
+                            <button id="generateSignalsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
+                                <i data-lucide="play" class="w-4 h-4"></i>
+                                <span>Generate Signals</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="signalsContainer" class="p-6">
+                        <div class="flex items-center justify-center py-12">
+                            <div class="loading-spinner"></div>
+                            <span class="ml-3 text-gray-600">Loading signals...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Traders -->
+            <div>
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-900">Top Traders</h2>
+                    </div>
+                    <div id="tradersContainer" class="p-6">
+                        <div class="flex items-center justify-center py-12">
+                            <div class="loading-spinner"></div>
+                            <span class="ml-3 text-gray-600">Loading traders...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="mt-8">
+            <div class="bg-white rounded-xl shadow-sm">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Recent Activity</h2>
+                </div>
+                <div id="activityContainer" class="p-6">
+                    <div class="flex items-center justify-center py-12">
+                        <div class="loading-spinner"></div>
+                        <span class="ml-3 text-gray-600">Loading activity...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div class="loading-spinner"></div>
+            <span class="text-gray-700">Processing...</span>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Global state
+        let currentStrategy = 'all';
+        let signalsData = [];
+        let tradersData = [];
+
+        // API base URL
+        const API_BASE = '/api';
+
+        // Utility functions
+        function showLoading(show = true) {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.toggle('hidden', !show);
+        }
+
+        function formatPercentage(value) {
+            return `${(value * 100).toFixed(1)}%`;
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat().format(value);
+        }
+
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        }
+
+        // API functions
+        async function fetchData(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // Load analytics summary
+        async function loadAnalytics() {
+            const data = await fetchData('/analytics/summary');
+            if (data && data.success) {
+                const analytics = data.data;
+                document.getElementById('totalTraders').textContent = analytics.traders.total;
+                document.getElementById('totalSignals').textContent = analytics.signals.total;
+                document.getElementById('dayTraders').textContent = analytics.traders.day_traders;
+                document.getElementById('longTermTraders').textContent = analytics.traders.long_term_traders;
+            }
+        }
+
+        // Load signals
+        async function loadSignals() {
+            const strategyParam = currentStrategy === 'all' ? '' : `?strategy_type=${currentStrategy}`;
+            const data = await fetchData(`/signals${strategyParam}`);
+            
+            if (data && data.success) {
+                signalsData = data.data;
+                renderSignals();
+            }
+        }
+
+        // Render signals
+        function renderSignals() {
+            const container = document.getElementById('signalsContainer');
+            
+            if (signalsData.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <i data-lucide="search" class="w-12 h-12 text-gray-400 mx-auto mb-4"></i>
+                        <p class="text-gray-600">No signals found for the selected strategy.</p>
+                        <button onclick="generateSignals()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            Generate New Signals
+                        </button>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            const signalsHtml = signalsData.map(signal => `
+                <div class="border border-gray-200 rounded-lg p-4 mb-4 card-hover fade-in">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 rounded-full ${signal.action === 'buy' ? 'bg-green-500' : 'bg-red-500'}"></div>
+                            <h3 class="font-semibold text-lg">${signal.instrument}</h3>
+                            <span class="px-2 py-1 text-xs rounded-full ${signal.action === 'buy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${signal.action.toUpperCase()}
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-600">${signal.strategy_type.replace('_', ' ')}</div>
+                            <div class="font-semibold">${formatPercentage(signal.confidence)} confidence</div>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 text-sm mb-3">${signal.reasoning}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span>Consensus: ${formatPercentage(signal.consensus_strength || 0)}</span>
+                        <span>${timeAgo(signal.created_at)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = signalsHtml;
+            lucide.createIcons();
+        }
+
+        // Load traders
+        async function loadTraders() {
+            const strategyParam = currentStrategy === 'all' ? '' : `?type=${currentStrategy}`;
+            const data = await fetchData(`/traders${strategyParam}&limit=10`);
+            
+            if (data && data.success) {
+                tradersData = data.data;
+                renderTraders();
+            }
+        }
+
+        // Render traders
+        function renderTraders() {
+            const container = document.getElementById('tradersContainer');
+            
+            if (tradersData.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <i data-lucide="users" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                        <p class="text-gray-600 text-sm">No traders found.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            const tradersHtml = tradersData.map((trader, index) => `
+                <div class="flex items-center justify-between py-3 ${index < tradersData.length - 1 ? 'border-b border-gray-100' : ''}">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                            ${trader.rank || index + 1}
+                        </div>
+                        <div>
+                            <div class="font-medium text-sm">${trader.display_name || trader.username}</div>
+                            <div class="text-xs text-gray-500">${trader.trader_type.replace('_', ' ')}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm font-semibold">${(trader.total_score || 0).toFixed(3)}</div>
+                        <div class="text-xs text-gray-500">score</div>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = tradersHtml;
+        }
+
+        // Load recent activity
+        async function loadActivity() {
+            const data = await fetchData('/analytics/summary');
+            if (data && data.success) {
+                const activity = data.data.recent_activity || [];
+                renderActivity(activity);
+            }
+        }
+
+        // Render activity
+        function renderActivity(activity) {
+            const container = document.getElementById('activityContainer');
+            
+            if (activity.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <i data-lucide="activity" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                        <p class="text-gray-600 text-sm">No recent activity.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            const activityHtml = activity.map(item => `
+                <div class="flex items-center space-x-4 py-3 border-b border-gray-100 last:border-b-0">
+                    <div class="w-2 h-2 rounded-full ${item.action === 'buy' ? 'bg-green-500' : 'bg-red-500'}"></div>
+                    <div class="flex-1">
+                        <span class="font-medium">${item.instrument}</span>
+                        <span class="text-gray-600">${item.action.toUpperCase()}</span>
+                        <span class="text-gray-500">signal generated</span>
+                    </div>
+                    <div class="text-sm text-gray-500">${timeAgo(item.created_at)}</div>
+                </div>
+            `).join('');
+
+            container.innerHTML = activityHtml;
+        }
+
+        // Generate signals
+        async function generateSignals() {
+            showLoading(true);
+            const data = await fetchData('/signals/generate', {
+                method: 'POST',
+                body: JSON.stringify({ strategy_type: currentStrategy })
+            });
+            showLoading(false);
+            
+            if (data && data.success) {
+                await loadSignals();
+                await loadAnalytics();
+                await loadActivity();
+            } else {
+                alert('Failed to generate signals. Please try again.');
+            }
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            showLoading(true);
+            await Promise.all([
+                loadAnalytics(),
+                loadSignals(),
+                loadTraders(),
+                loadActivity()
+            ]);
+            showLoading(false);
+        }
+
+        // Strategy tab handling
+        function switchStrategy(strategy) {
+            currentStrategy = strategy;
+            
+            // Update tab styles
+            document.querySelectorAll('.strategy-tab').forEach(tab => {
+                tab.classList.remove('border-blue-500', 'text-blue-600');
+                tab.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            const activeTab = document.querySelector(`[data-strategy="${strategy}"]`);
+            activeTab.classList.remove('border-transparent', 'text-gray-500');
+            activeTab.classList.add('border-blue-500', 'text-blue-600');
+            
+            // Reload data for new strategy
+            loadSignals();
+            loadTraders();
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Strategy tabs
+            document.querySelectorAll('.strategy-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    switchStrategy(tab.dataset.strategy);
+                });
+            });
+
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', refreshData);
+
+            // Generate signals button
+            document.getElementById('generateSignalsBtn').addEventListener('click', generateSignals);
+
+            // Initial load
+            refreshData();
+        });
+    </script>
+</body>
+</html>
+

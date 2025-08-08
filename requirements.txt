@@ -1,0 +1,9 @@
+Flask
+Flask-Cors
+requests
+yfinance
+numpy
+pandas
+peewee
+flask-sqlalchemy
+
